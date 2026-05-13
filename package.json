@@ -1,0 +1,10 @@
+{
+  "name": "hotrodoanhnghiep",
+  "version": "1.0.0",
+  "description": "Fullstack monorepo - React + Express + MongoDB",
+  "scripts": {
+    "dev:fe": "npm run dev --prefix fe",
+    "dev:be": "npm run dev --prefix be",
+    "install:all": "npm install --prefix fe && npm install --prefix be"
+  }
+}

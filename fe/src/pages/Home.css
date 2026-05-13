@@ -1,0 +1,85 @@
+@import './Dashboard.css';
+
+/* ── WELCOME BANNER ── */
+.welcome-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #1a4f8a, #2563a8);
+  border-radius: 16px;
+  padding: 28px 32px;
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+.welcome-text h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.welcome-text p  { font-size: 14px; opacity: .82; line-height: 1.5; }
+
+.welcome-avatar {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── SHORTCUT GRID ── */
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.shortcut-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: border-color .2s, box-shadow .2s, transform .15s;
+  text-align: left;
+  width: 100%;
+}
+.shortcut-card:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 4px 16px rgba(26,79,138,.1);
+  transform: translateY(-2px);
+}
+
+.shortcut-icon {
+  width: 46px; height: 46px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.shortcut-icon svg { width: 22px; height: 22px; }
+
+.shortcut-label { font-size: 14px; font-weight: 600; color: #0d2e5a; margin-bottom: 3px; }
+.shortcut-desc  { font-size: 12.5px; color: #6b7280; }
+
+/* ── INFO CARD ── */
+.info-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px 28px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+}
+.info-card h3 { font-size: 15px; font-weight: 700; color: #0d2e5a; margin-bottom: 16px; }
+
+.info-row {
+  display: flex; align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-row span { width: 140px; color: #6b7280; flex-shrink: 0; }
+.info-row b    { color: #111827; font-weight: 500; }
+.status-active { color: #16a34a !important; }

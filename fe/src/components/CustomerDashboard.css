@@ -1,0 +1,140 @@
+.cd-loading,
+.cd-error {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+.cd-error { color: #dc2626; }
+
+.cd-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Header banner */
+.cd-header-banner {
+  background: linear-gradient(90deg, #1a3a6b, #2563eb);
+  color: #fff;
+  border-radius: 12px;
+  padding: 20px 28px;
+}
+.cd-header-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.cd-header-sub {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 4px;
+  opacity: 0.88;
+  text-transform: uppercase;
+}
+
+/* Stat row */
+.cd-stat-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cd-stat-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 24px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cd-stat-label {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+.cd-stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1a3a6b;
+}
+.cd-stat-money {
+  font-size: 17px;
+}
+
+/* Section */
+.cd-section {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+}
+.cd-section-title {
+  background: linear-gradient(90deg, #1a3a6b, #2563eb);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-align: center;
+  padding: 10px 20px;
+  text-transform: uppercase;
+}
+.cd-chart-table {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 0;
+}
+.cd-chart {
+  padding: 16px 8px 8px;
+  border-right: 1px solid #e5e7eb;
+}
+.cd-chart-xlabel {
+  text-align: center;
+  font-size: 11px;
+  color: #6b7280;
+  padding-bottom: 8px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+/* Table */
+.cd-table-wrap {
+  padding: 12px;
+  overflow-x: auto;
+}
+.cd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cd-table th {
+  background: #1a3a6b;
+  color: #fff;
+  padding: 8px 12px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+.cd-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #374151;
+}
+.cd-table tr:last-child td { border-bottom: none; }
+.cd-table tr:nth-child(even) td { background: #f8fafc; }
+.cd-num {
+  text-align: center;
+  font-weight: 600;
+  color: #1a3a6b;
+}
+
+@media (max-width: 900px) {
+  .cd-chart-table {
+    grid-template-columns: 1fr;
+  }
+  .cd-chart {
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+  }
+}
