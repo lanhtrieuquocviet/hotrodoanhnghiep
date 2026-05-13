@@ -44,3 +44,9 @@ Thumbs.db
 .eslintcache
 .cache/
 .parcel-cache/
+.vite/
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
