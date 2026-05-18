@@ -8,6 +8,22 @@ import './CustomerDashboard.css'
 const formatVND = (v: number) =>
   v > 0 ? v.toLocaleString('vi-VN') + ' đ' : '0 đ'
 
+const KHU_BAR_HEIGHT = 36
+const KHU_CHART_SCROLL_MAX = 420
+
+function sortKhuBySoLuong<T extends { soLuong: number }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => b.soLuong - a.soLuong)
+}
+
+function khuChartHeight(count: number) {
+  return Math.max(160, count * KHU_BAR_HEIGHT + 24)
+}
+
+function khuYAxisWidth(rows: { khuCongNghiep: string }[]) {
+  const maxLen = rows.reduce((m, r) => Math.max(m, r.khuCongNghiep.length), 0)
+  return Math.min(220, Math.max(110, maxLen * 7.5))
+}
+
 export default function CustomerDashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -30,6 +46,15 @@ export default function CustomerDashboard() {
 
 /* ── VIEW TỔNG HỢP (Admin) ── */
 function TongHopView({ data }: { data: Extract<DashboardData, { viewType: 'tong-hop' }> }) {
+  const khuData = sortKhuBySoLuong(data.theoKhuCongNghiep)
+  const khuChartH = khuChartHeight(khuData.length)
+  const khuYWidth = khuYAxisWidth(khuData)
+  const khuScrollable = khuChartH > KHU_CHART_SCROLL_MAX
+
+  const tongSoLuongPhong = data.theoPhong.reduce((s, r) => s + r.soLuong, 0)
+  const tongDoanhThuPhong = data.theoPhong.reduce((s, r) => s + r.giaTriTong, 0)
+  const tongSoLuongKhu = khuData.reduce((s, r) => s + r.soLuong, 0)
+
   return (
     <div className="cd-wrapper">
       <div className="cd-header-banner">
@@ -82,6 +107,13 @@ function TongHopView({ data }: { data: Extract<DashboardData, { viewType: 'tong-
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="cd-table-total">
+                  <td>Tổng cộng</td>
+                  <td className="cd-num">{tongSoLuongPhong}</td>
+                  <td className="cd-num">{formatVND(tongDoanhThuPhong)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -91,22 +123,39 @@ function TongHopView({ data }: { data: Extract<DashboardData, { viewType: 'tong-
       <section className="cd-section">
         <div className="cd-section-title">SỐ LƯỢNG HỢP ĐỒNG TRONG CÁC KHU CÔNG NGHIỆP</div>
         <div className="cd-chart-table">
-          <div className="cd-chart">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={data.theoKhuCongNghiep} margin={{ top: 20, right: 20, left: 0, bottom: 80 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="khuCongNghiep" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
-                <YAxis
-                  tick={{ fontSize: 12 }} allowDecimals={false}
-                  label={{ value: 'Số lượng HĐ', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#6b7280' } }}
-                />
-                <Tooltip formatter={(v: number) => [v, 'Số HĐ']} />
-                <Bar dataKey="soLuong" fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="soLuong" position="top" style={{ fontSize: 11, fontWeight: 600 }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="cd-chart-xlabel">TÊN KHU CÔNG NGHIỆP</div>
+          <div className="cd-chart cd-chart-khu">
+            <div className={khuScrollable ? 'cd-chart-khu-scroll' : undefined}>
+              <ResponsiveContainer width="100%" height={khuChartH}>
+                <BarChart
+                  layout="vertical"
+                  data={khuData}
+                  margin={{ top: 8, right: 48, left: 8, bottom: 28 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 12 }}
+                    label={{
+                      value: 'Số lượng HĐ',
+                      position: 'insideBottom',
+                      offset: -4,
+                      style: { fontSize: 11, fill: '#6b7280' },
+                    }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="khuCongNghiep"
+                    width={khuYWidth}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <Tooltip formatter={(v: number) => [v, 'Số HĐ']} />
+                  <Bar dataKey="soLuong" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={28}>
+                    <LabelList dataKey="soLuong" position="right" style={{ fontSize: 11, fontWeight: 600 }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
           <div className="cd-table-wrap">
             <table className="cd-table">
@@ -114,7 +163,7 @@ function TongHopView({ data }: { data: Extract<DashboardData, { viewType: 'tong-
                 <tr><th>Tên khu công nghiệp</th><th>Số lượng</th><th>Loại</th></tr>
               </thead>
               <tbody>
-                {data.theoKhuCongNghiep.map((row) => (
+                {khuData.map((row) => (
                   <tr key={row.khuCongNghiep}>
                     <td>{row.khuCongNghiep}</td>
                     <td className="cd-num">{row.soLuong}</td>
@@ -122,10 +171,28 @@ function TongHopView({ data }: { data: Extract<DashboardData, { viewType: 'tong-
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="cd-table-total">
+                  <td>Tổng cộng</td>
+                  <td className="cd-num">{tongSoLuongKhu}</td>
+                  <td>—</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
       </section>
+
+      <div className="cd-grand-total">
+        <div className="cd-grand-total-item">
+          <span className="cd-grand-total-label">Tổng số lượng hợp đồng:</span>
+          <span className="cd-grand-total-value">{data.tongHopDong}</span>
+        </div>
+        <div className="cd-grand-total-item">
+          <span className="cd-grand-total-label">Tổng doanh thu:</span>
+          <span className="cd-grand-total-value cd-grand-total-money">{formatVND(tongDoanhThuPhong)}</span>
+        </div>
+      </div>
     </div>
   )
 }
