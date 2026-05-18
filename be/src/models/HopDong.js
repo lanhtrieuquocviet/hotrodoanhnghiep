@@ -4,11 +4,7 @@ const hopDongSchema = new mongoose.Schema(
   {
     soHopDong: { type: String, trim: true },
     tenDoanhNghiep: { type: String, required: true, trim: true },
-    phong: {
-      type: String,
-      required: true,
-      enum: ['Phòng Dịch vụ Tổng hợp, Đào tạo và Bồi dưỡng', 'Phòng Dịch vụ Khoa học Công nghệ'],
-    },
+    phong: { type: String, required: true },
     nguoiPhuTrach: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     sdtVaNguoiLienHe: { type: String, trim: true },
     khuCongNghiep: { type: String, trim: true },

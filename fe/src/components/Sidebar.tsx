@@ -46,7 +46,9 @@ export default function Sidebar({ active }: { active: ActiveKey }) {
           <div>
             <div className="user-name">{user?.name}</div>
             <div className="user-role">
-              {user?.phong ? user.phong.replace('Phòng Dịch vụ ', '') : 'Người dùng'}
+              {user?.role === 'truong_phong'
+                ? `TP – ${user.phong?.replace('Phòng Dịch vụ ', '') ?? ''}`
+                : user?.phong ? user.phong.replace('Phòng Dịch vụ ', '') : 'Người dùng'}
             </div>
           </div>
         </a>

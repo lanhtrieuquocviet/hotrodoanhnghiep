@@ -3,6 +3,7 @@ import { protect } from '../middleware/auth.js';
 import {
   getDashboard,
   getNhanVien,
+  getTruongPhong,
   getHopDongs,
   createHopDong,
   updateHopDong,
@@ -15,6 +16,7 @@ router.use(protect);
 
 router.get('/dashboard', getDashboard);
 router.get('/nhan-vien', getNhanVien);
+router.get('/truong-phong', getTruongPhong);
 router.get('/', getHopDongs);
 router.post('/', createHopDong);
 router.put('/:id', updateHopDong);

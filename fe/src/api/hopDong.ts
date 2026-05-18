@@ -15,6 +15,16 @@ export type DashboardData =
       doanhThuPhong: number
       theoNhanVien: { tenNhanVien: string; soLuong: number; giaTriTong: number }[]
     }
+  | {
+      viewType: 'truong-phong'
+      phong: string
+      tongHopDong: number
+      doanhThuPhong: number
+      tongDoanhNghiep: number
+      theoNhanVien: { tenNhanVien: string; soLuong: number; giaTriTong: number }[]
+      theoTrangThai: { trangThai: string; soLuong: number }[]
+      theoTrangThaiKy: { trangThaiKy: string; soLuong: number }[]
+    }
 
 export interface HopDong {
   _id: string

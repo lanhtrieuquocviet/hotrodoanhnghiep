@@ -2,24 +2,23 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import { getPhong } from '../api/phong'
 import './Users.css'
 
+type Role = 'admin' | 'truong_phong' | 'user'
 interface User {
   _id: string
   name: string
   email: string
-  role: 'admin' | 'user'
+  role: Role
   phong?: string | null
   isActive: boolean
   createdAt: string
 }
 
-const PHONG_OPTIONS = [
-  'Phòng Dịch vụ Tổng hợp, Đào tạo và Bồi dưỡng',
-  'Phòng Dịch vụ Khoa học Công nghệ',
-]
+const EMPTY_FORM = { name: '', email: '', password: '', role: 'user' as Role, phong: '' }
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'user' as 'admin' | 'user', phong: '' }
+const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', truong_phong: 'Trưởng phòng', user: 'Nhân viên' }
 
 export default function Users() {
   const { user: me, logout } = useAuth()
@@ -27,6 +26,7 @@ export default function Users() {
 
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [phongOptions, setPhongOptions] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -53,6 +53,7 @@ export default function Users() {
   }
 
   useEffect(() => { fetchUsers(page, search) }, [page])
+  useEffect(() => { getPhong().then(list => setPhongOptions(list.map(p => p.ten))) }, [])
 
   const handleSearch = (val: string) => {
     setSearch(val)
@@ -61,7 +62,7 @@ export default function Users() {
   }
 
   const openCreate = () => { setForm(EMPTY_FORM); setFormError(''); setModal('create') }
-  const openEdit = (u: User) => { setSelected(u); setForm({ name: u.name, email: u.email, password: '', role: u.role, phong: u.phong || '' }); setFormError(''); setModal('edit') }
+  const openEdit = (u: User) => { setSelected(u); setForm({ name: u.name, email: u.email, password: '', role: u.role as Role, phong: u.phong || '' }); setFormError(''); setModal('edit') }
   const openDelete = (u: User) => { setSelected(u); setModal('delete') }
   const openReset = (u: User) => { setSelected(u); setResetPwd(''); setFormError(''); setModal('reset') }
   const closeModal = () => { setModal(null); setSelected(null); setFormError('') }
@@ -152,13 +153,20 @@ export default function Users() {
             </svg>
             Quản lý tài khoản
           </a>
+          <a href="/phong-ban" className="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            Quản lý phòng ban
+          </a>
         </nav>
         <div className="sidebar-footer">
           <div className="user-info">
             <div className="user-avatar">{me?.name?.[0]?.toUpperCase()}</div>
             <div>
               <div className="user-name">{me?.name}</div>
-              <div className="user-role">{me?.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}</div>
+              <div className="user-role">Quản trị viên</div>
             </div>
           </div>
           <button className="btn-logout" onClick={handleLogout}>
@@ -234,7 +242,7 @@ export default function Users() {
                     </td>
                     <td>
                       <span className={`badge-role ${u.role}`}>
-                        {u.role === 'admin' ? 'Admin' : 'User'}
+                        {ROLE_LABEL[u.role]}
                       </span>
                     </td>
                     <td>
@@ -296,20 +304,35 @@ export default function Users() {
         <Modal title="Thêm tài khoản" onClose={closeModal} onConfirm={handleCreate} confirmText="Tạo tài khoản" submitting={submitting}>
           <FormField label="Họ tên *" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="Nguyễn Văn A" />
           <FormField label="Email *" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="example@essc.vn" />
-          <FormField label="Mật khẩu *" value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} placeholder="Tối thiểu 6 ký tự" type="password" />
+          <div className="modal-field">
+            <div className="modal-field-header">
+              <label>Mật khẩu *</label>
+              <button type="button" className="btn-default-pass" onClick={() => setForm(f => ({ ...f, password: 'pass123456' }))}>
+                Dùng mật khẩu mặc định
+              </button>
+            </div>
+            <input
+              type="password"
+              value={form.password}
+              onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+              placeholder="Tối thiểu 6 ký tự"
+              autoComplete="new-password"
+            />
+          </div>
           <div className="modal-field">
             <label>Vai trò</label>
-            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as 'admin' | 'user' }))}>
-              <option value="user">User</option>
+            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as Role, phong: e.target.value === 'admin' ? '' : f.phong }))}>
+              <option value="user">Nhân viên</option>
+              <option value="truong_phong">Trưởng phòng</option>
               <option value="admin">Admin</option>
             </select>
           </div>
-          {form.role === 'user' && (
+          {(form.role === 'user' || form.role === 'truong_phong') && (
             <div className="modal-field">
               <label>Phòng ban</label>
               <select value={form.phong} onChange={e => setForm(f => ({ ...f, phong: e.target.value }))}>
                 <option value="">— Chọn phòng —</option>
-                {PHONG_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                {phongOptions.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
           )}
@@ -327,17 +350,18 @@ export default function Users() {
           </div>
           <div className="modal-field">
             <label>Vai trò</label>
-            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as 'admin' | 'user', phong: e.target.value === 'admin' ? '' : f.phong }))}>
-              <option value="user">User</option>
+            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as Role, phong: e.target.value === 'admin' ? '' : f.phong }))}>
+              <option value="user">Nhân viên</option>
+              <option value="truong_phong">Trưởng phòng</option>
               <option value="admin">Admin</option>
             </select>
           </div>
-          {form.role === 'user' && (
+          {(form.role === 'user' || form.role === 'truong_phong') && (
             <div className="modal-field">
               <label>Phòng ban</label>
               <select value={form.phong} onChange={e => setForm(f => ({ ...f, phong: e.target.value }))}>
                 <option value="">— Chọn phòng —</option>
-                {PHONG_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                {phongOptions.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
           )}

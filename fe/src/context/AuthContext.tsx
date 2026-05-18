@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import api from '../api/axios'
 
-interface User { _id: string; name: string; email: string; role: string; phong?: string | null; isActive: boolean }
+interface User { _id: string; name: string; email: string; role: 'admin' | 'truong_phong' | 'user'; phong?: string | null; isActive: boolean }
 interface AuthContextType {
   user: User | null
   loading: boolean

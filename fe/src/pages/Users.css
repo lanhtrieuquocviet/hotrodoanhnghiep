@@ -142,8 +142,9 @@
   font-size: 12px;
   font-weight: 600;
 }
-.badge-role.admin { background: #eff6ff; color: #1a4f8a; }
-.badge-role.user  { background: #f0fdf4; color: #16a34a; }
+.badge-role.admin        { background: #eff6ff; color: #1a4f8a; }
+.badge-role.truong_phong { background: #fef3c7; color: #92400e; }
+.badge-role.user         { background: #f0fdf4; color: #16a34a; }
 
 .badge-phong {
   display: inline-block;
@@ -272,6 +273,20 @@
 
 .modal-field { display: flex; flex-direction: column; gap: 6px; }
 .modal-field label { font-size: 13px; font-weight: 600; color: #374151; }
+
+.modal-field-header { display: flex; align-items: center; justify-content: space-between; }
+.btn-default-pass {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-default-pass:hover { color: #1d4ed8; }
 .modal-field input,
 .modal-field select {
   height: 42px;

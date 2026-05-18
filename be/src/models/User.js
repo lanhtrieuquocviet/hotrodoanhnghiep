@@ -6,12 +6,8 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6 },
-    role: { type: String, enum: ['admin', 'user'], default: 'user' },
-    phong: {
-      type: String,
-      enum: ['Phòng Dịch vụ Tổng hợp, Đào tạo và Bồi dưỡng', 'Phòng Dịch vụ Khoa học Công nghệ'],
-      default: null,
-    },
+    role: { type: String, enum: ['admin', 'truong_phong', 'user'], default: 'user' },
+    phong: { type: String, default: null },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

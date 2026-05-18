@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
+import PhongBan from './pages/PhongBan'
 import Home from './pages/Home'
 import Profile from './pages/Profile'
 import HopDong from './pages/HopDong'
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/login"     element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
           <Route path="/users"     element={<AdminRoute><Users /></AdminRoute>} />
+          <Route path="/phong-ban" element={<AdminRoute><PhongBan /></AdminRoute>} />
           <Route path="/hop-dong"  element={<PrivateRoute><HopDong /></PrivateRoute>} />
           <Route path="/home"      element={<PrivateRoute><Home /></PrivateRoute>} />
           <Route path="/profile"   element={<PrivateRoute><Profile /></PrivateRoute>} />

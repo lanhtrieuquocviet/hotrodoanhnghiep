@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
+  PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { getDashboard, type DashboardData } from '../api/hopDong'
 import './CustomerDashboard.css'
@@ -40,6 +41,7 @@ export default function CustomerDashboard() {
   if (error)   return <div className="cd-error">{error}</div>
   if (!data)   return null
 
+  if (data.viewType === 'truong-phong') return <TruongPhongView data={data} />
   if (data.viewType === 'theo-phong') return <PhongView data={data} />
   return <TongHopView data={data} />
 }
@@ -193,6 +195,135 @@ function TongHopView({ data }: { data: Extract<DashboardData, { viewType: 'tong-
           <span className="cd-grand-total-value cd-grand-total-money">{formatVND(tongDoanhThuPhong)}</span>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ── VIEW TRƯỞNG PHÒNG ── */
+const TRANG_THAI_COLORS: Record<string, string> = {
+  'Đang thực hiện': '#3b82f6',
+  'Đã hoàn thành': '#22c55e',
+  'Hủy': '#ef4444',
+}
+const TRANG_THAI_KY_COLORS: Record<string, string> = {
+  'Đã ký kết': '#22c55e',
+  'Đang thương thảo': '#f59e0b',
+  'Chưa ký': '#9ca3af',
+}
+
+function TruongPhongView({ data }: { data: Extract<DashboardData, { viewType: 'truong-phong' }> }) {
+  const tongDoanhThu = data.theoNhanVien.reduce((s, r) => s + r.giaTriTong, 0)
+
+  return (
+    <div className="cd-wrapper">
+      <div className="cd-header-banner">
+        <div className="cd-header-title">TRUNG TÂM DỊCH VỤ VÀ HỖ TRỢ DOANH NGHIỆP</div>
+        <div className="cd-header-sub">{data.phong.toUpperCase()} — TRƯỞNG PHÒNG</div>
+      </div>
+
+      {/* Thống kê tổng */}
+      <div className="cd-stat-row">
+        <div className="cd-stat-box">
+          <span className="cd-stat-label">Số doanh nghiệp:</span>
+          <span className="cd-stat-value">{data.tongDoanhNghiep}</span>
+        </div>
+        <div className="cd-stat-box">
+          <span className="cd-stat-label">Tổng hợp đồng:</span>
+          <span className="cd-stat-value">{data.tongHopDong}</span>
+        </div>
+        <div className="cd-stat-box">
+          <span className="cd-stat-label">Doanh thu phòng:</span>
+          <span className="cd-stat-value cd-stat-money">{formatVND(data.doanhThuPhong)}</span>
+        </div>
+      </div>
+
+      {/* Hiệu suất nhân viên */}
+      <section className="cd-section">
+        <div className="cd-section-title">HIỆU SUẤT NHÂN VIÊN</div>
+        <div className="cd-chart-table">
+          <div className="cd-chart">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.theoNhanVien} margin={{ top: 20, right: 20, left: 20, bottom: 70 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="tenNhanVien" tick={{ fontSize: 11 }} angle={-20} textAnchor="end" interval={0} />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => v >= 1_000_000 ? (v / 1_000_000).toFixed(0) + 'M' : String(v)}
+                  label={{ value: 'Giá trị (đ)', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#6b7280' } }}
+                />
+                <Tooltip formatter={(v: number) => [formatVND(v), 'Doanh thu']} />
+                <Bar dataKey="giaTriTong" fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="giaTriTong"
+                    position="top"
+                    formatter={(v: number) => v > 0 ? formatVND(v) : ''}
+                    style={{ fontSize: 10, fontWeight: 600, fill: '#1e40af' }}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="cd-chart-xlabel">NHÂN VIÊN PHỤ TRÁCH</div>
+          </div>
+          <div className="cd-table-wrap">
+            <table className="cd-table">
+              <thead>
+                <tr><th>Nhân viên</th><th>Số HĐ</th><th>Doanh thu</th></tr>
+              </thead>
+              <tbody>
+                {data.theoNhanVien.map((row) => (
+                  <tr key={row.tenNhanVien}>
+                    <td>{row.tenNhanVien}</td>
+                    <td className="cd-num">{row.soLuong}</td>
+                    <td className="cd-num">{formatVND(row.giaTriTong)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="cd-table-total">
+                  <td>Tổng cộng</td>
+                  <td className="cd-num">{data.theoNhanVien.reduce((s, r) => s + r.soLuong, 0)}</td>
+                  <td className="cd-num">{formatVND(tongDoanhThu)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Tình trạng hợp đồng */}
+      <section className="cd-section">
+        <div className="cd-section-title">TÌNH TRẠNG HỢP ĐỒNG</div>
+        <div className="cd-pie-row">
+          <div className="cd-pie-block">
+            <div className="cd-pie-label">Trạng thái thực hiện</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={data.theoTrangThai} dataKey="soLuong" nameKey="trangThai" cx="50%" cy="50%" outerRadius={80} label={({ trangThai, soLuong }) => `${trangThai}: ${soLuong}`}>
+                  {data.theoTrangThai.map((entry) => (
+                    <Cell key={entry.trangThai} fill={TRANG_THAI_COLORS[entry.trangThai] ?? '#94a3b8'} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number) => [v, 'Số HĐ']} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="cd-pie-block">
+            <div className="cd-pie-label">Tình trạng ký kết</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={data.theoTrangThaiKy} dataKey="soLuong" nameKey="trangThaiKy" cx="50%" cy="50%" outerRadius={80} label={({ trangThaiKy, soLuong }) => `${trangThaiKy}: ${soLuong}`}>
+                  {data.theoTrangThaiKy.map((entry) => (
+                    <Cell key={entry.trangThaiKy} fill={TRANG_THAI_KY_COLORS[entry.trangThaiKy] ?? '#94a3b8'} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number) => [v, 'Số HĐ']} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

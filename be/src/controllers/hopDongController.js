@@ -1,10 +1,6 @@
 import HopDong from '../models/HopDong.js';
 import User from '../models/User.js';
 
-const PHONG_OPTIONS = [
-  'Phòng Dịch vụ Tổng hợp, Đào tạo và Bồi dưỡng',
-  'Phòng Dịch vụ Khoa học Công nghệ',
-];
 const KHU_KHAC = 'Khác';
 const KHU_PRESET = [
   'CNC Hòa Lạc', 'Nội Bài', 'Phú Nghĩa', 'Quang Minh', 'Sài Đồng',
@@ -20,7 +16,7 @@ function validateHopDongBody(body) {
   if (ten.length < 2) return 'Tên doanh nghiệp quá ngắn';
   if (ten.length > 200) return 'Tên doanh nghiệp tối đa 200 ký tự';
 
-  if (!body.phong || !PHONG_OPTIONS.includes(body.phong)) return 'Phòng ban không hợp lệ';
+  if (!body.phong?.trim()) return 'Phòng ban không được để trống';
 
   if (body.soHopDong?.trim().length > 50) return 'Số hợp đồng tối đa 50 ký tự';
   if (body.sdtVaNguoiLienHe?.trim().length > 100) return 'SDT / người liên hệ tối đa 100 ký tự';
@@ -56,6 +52,39 @@ function validateHopDongBody(body) {
 export const getDashboard = async (req, res, next) => {
   try {
     const { user } = req;
+
+    if (user.role === 'truong_phong' && user.phong) {
+      const matchPhong = { phong: user.phong };
+      const nhanVienAgg = [
+        { $match: matchPhong },
+        { $group: { _id: '$nguoiPhuTrach', soLuong: { $sum: 1 }, giaTriTong: { $sum: '$giaTriHopDong' } } },
+        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'nv' } },
+        { $unwind: { path: '$nv', preserveNullAndEmptyArrays: true } },
+        { $project: { tenNhanVien: { $ifNull: ['$nv.name', 'Không xác định'] }, soLuong: 1, giaTriTong: 1 } },
+        { $sort: { giaTriTong: -1 } },
+      ];
+      const [theoNhanVien, tongHopDong, doanhThuPhong, theoTrangThai, theoTrangThaiKy, tongDoanhNghiep] = await Promise.all([
+        HopDong.aggregate(nhanVienAgg),
+        HopDong.countDocuments(matchPhong),
+        HopDong.aggregate([{ $match: matchPhong }, { $group: { _id: null, total: { $sum: '$giaTriHopDong' } } }])
+          .then((r) => r[0]?.total || 0),
+        HopDong.aggregate([
+          { $match: matchPhong },
+          { $group: { _id: '$trangThai', soLuong: { $sum: 1 } } },
+        ]),
+        HopDong.aggregate([
+          { $match: matchPhong },
+          { $group: { _id: '$trangThaiKy', soLuong: { $sum: 1 } } },
+        ]),
+        HopDong.distinct('tenDoanhNghiep', matchPhong).then((arr) => arr.length),
+      ]);
+      return res.json({
+        viewType: 'truong-phong', phong: user.phong, tongHopDong, doanhThuPhong, tongDoanhNghiep,
+        theoNhanVien: theoNhanVien.map((x) => ({ tenNhanVien: x.tenNhanVien, soLuong: x.soLuong, giaTriTong: x.giaTriTong })),
+        theoTrangThai: theoTrangThai.map((x) => ({ trangThai: x._id || 'Không rõ', soLuong: x.soLuong })),
+        theoTrangThaiKy: theoTrangThaiKy.map((x) => ({ trangThaiKy: x._id || 'Không rõ', soLuong: x.soLuong })),
+      });
+    }
 
     if (user.role !== 'admin' && user.phong) {
       const matchPhong = { phong: user.phong };
@@ -101,6 +130,16 @@ export const getDashboard = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+/* ── TRƯỞNG PHÒNG theo phòng ── */
+export const getTruongPhong = async (req, res, next) => {
+  try {
+    const users = await User.find({ role: 'truong_phong', isActive: true }).select('name phong');
+    const map = {};
+    users.forEach((u) => { if (u.phong) map[u.phong] = u.name; });
+    res.json(map);
+  } catch (err) { next(err); }
+};
+
 /* ── NHÂN VIÊN theo phòng (cho dropdown) ── */
 export const getNhanVien = async (req, res, next) => {
   try {
@@ -124,7 +163,7 @@ export const getHopDongs = async (req, res, next) => {
     if (search) filter.tenDoanhNghiep = { $regex: search, $options: 'i' };
 
     const hopDongs = await HopDong.find(filter)
-      .populate('nguoiPhuTrach', 'name phong')
+      .populate('nguoiPhuTrach', 'name phong role')
       .sort({ nguoiPhuTrach: 1, createdAt: 1 });
 
     res.json({ hopDongs, total: hopDongs.length });
@@ -136,13 +175,18 @@ export const createHopDong = async (req, res, next) => {
     const { user } = req;
     const body = { ...req.body };
 
-    if (user.role !== 'admin' && user.phong) body.phong = user.phong;
-    body.nguoiPhuTrach = user._id;
+    if (user.role === 'truong_phong') {
+      body.phong = user.phong;
+      if (!body.nguoiPhuTrach) body.nguoiPhuTrach = user._id;
+    } else if (user.role !== 'admin' && user.phong) {
+      body.phong = user.phong;
+      body.nguoiPhuTrach = user._id;
+    }
 
     const errMsg = validateHopDongBody(body);
     if (errMsg) return res.status(400).json({ message: errMsg });
 
-    const hopDong = await (await HopDong.create(body)).populate('nguoiPhuTrach', 'name phong');
+    const hopDong = await HopDong.create(body).then(d => d.populate('nguoiPhuTrach', 'name phong role'));
     res.status(201).json(hopDong);
   } catch (err) { next(err); }
 };
@@ -154,7 +198,10 @@ export const updateHopDong = async (req, res, next) => {
     if (!existing) return res.status(404).json({ message: 'Không tìm thấy hợp đồng' });
 
     const body = { ...req.body };
-    if (user.role !== 'admin' && user.phong) {
+    if (user.role === 'truong_phong') {
+      body.phong = user.phong;
+      if (!body.nguoiPhuTrach) body.nguoiPhuTrach = existing.nguoiPhuTrach || user._id;
+    } else if (user.role !== 'admin' && user.phong) {
       body.phong = user.phong;
       body.nguoiPhuTrach = existing.nguoiPhuTrach || user._id;
     }
@@ -163,7 +210,7 @@ export const updateHopDong = async (req, res, next) => {
     if (errMsg) return res.status(400).json({ message: errMsg });
 
     const hopDong = await HopDong.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true })
-      .populate('nguoiPhuTrach', 'name phong');
+      .populate('nguoiPhuTrach', 'name phong role');
     res.json(hopDong);
   } catch (err) { next(err); }
 };

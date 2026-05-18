@@ -2,11 +2,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
-import { PHONG_OPTIONS, KHU_OPTIONS, KHU_PRESET_OPTIONS, KHU_KHAC } from '../api/hopDong'
+import { KHU_OPTIONS, KHU_PRESET_OPTIONS, KHU_KHAC } from '../api/hopDong'
+import { getPhong } from '../api/phong'
 import './HopDong.css'
 
 /* ── Types ── */
-interface NhanVien { _id: string; name: string }
+interface NhanVien { _id: string; name: string; role?: string }
 interface HopDong {
   _id: string
   soHopDong?: string
@@ -136,13 +137,14 @@ const formatNgay = (d?: string) => {
 }
 
 /* ── Grouped data helper ── */
-interface Group { nhanVien: string; nhanVienId: string; items: HopDong[]; tongGiaTri: number }
+interface Group { nhanVien: string; nhanVienId: string; nhanVienRole?: string; items: HopDong[]; tongGiaTri: number }
 function groupByNV(list: HopDong[]): Group[] {
   const map = new Map<string, Group>()
   list.forEach((hd) => {
     const key = hd.nguoiPhuTrach?._id ?? '__none__'
     const name = hd.nguoiPhuTrach?.name ?? 'Chưa phân công'
-    if (!map.has(key)) map.set(key, { nhanVien: name, nhanVienId: key, items: [], tongGiaTri: 0 })
+    const role = hd.nguoiPhuTrach?.role
+    if (!map.has(key)) map.set(key, { nhanVien: name, nhanVienId: key, nhanVienRole: role, items: [], tongGiaTri: 0 })
     const g = map.get(key)!
     g.items.push(hd)
     g.tongGiaTri += hd.giaTriHopDong || 0
@@ -178,6 +180,8 @@ export default function HopDongPage() {
   const [filterTrangThai, setFilterTrangThai] = useState('')
   const [filterXacNhan, setFilterXacNhan] = useState('')
   const [filterPhong, setFilterPhong] = useState('')
+  const [phongOptions, setPhongOptions] = useState<string[]>([])
+
 
   const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [selected, setSelected] = useState<HopDong | null>(null)
@@ -212,7 +216,14 @@ export default function HopDongPage() {
     setFilterXacNhan(''); setFilterPhong('')
   }
 
-  useEffect(() => { fetchData('') }, [])
+  useEffect(() => {
+    fetchData('')
+    getPhong().then(list => {
+      const names = list.map(p => p.ten)
+      setPhongOptions(names)
+      if (names.length > 0) setFilterPhong(names[0])
+    })
+  }, [])
 
   const handleSearch = (v: string) => {
     setSearch(v)
@@ -386,7 +397,11 @@ export default function HopDongPage() {
             <div className="user-avatar">{me?.name?.[0]?.toUpperCase()}</div>
             <div>
               <div className="user-name">{me?.name}</div>
-              <div className="user-role">{me?.phong ? me.phong.replace('Phòng Dịch vụ ', '') : (me?.role === 'admin' ? 'Quản trị viên' : 'Người dùng')}</div>
+              <div className="user-role">
+                {me?.role === 'admin' ? 'Quản trị viên'
+                  : me?.role === 'truong_phong' ? `TP – ${me.phong?.replace('Phòng Dịch vụ ', '') ?? ''}`
+                  : me?.phong ? me.phong.replace('Phòng Dịch vụ ', '') : 'Người dùng'}
+              </div>
             </div>
           </div>
           <button className="btn-logout" onClick={handleLogout}>
@@ -430,14 +445,23 @@ export default function HopDongPage() {
           </div>
         </div>
 
+        {/* Phong tabs — admin only */}
+        {me?.role === 'admin' && phongOptions.length > 0 && (
+          <div className="hd-phong-tabs">
+            {phongOptions.map(p => (
+              <button
+                key={p}
+                className={`hd-phong-tab${filterPhong === p ? ' active' : ''}`}
+                onClick={() => setFilterPhong(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Filter row */}
         <div className="hd-filter-row">
-          {me?.role === 'admin' && (
-            <select className={`hd-filter-select${filterPhong ? ' active' : ''}`} value={filterPhong} onChange={e => setFilterPhong(e.target.value)}>
-              <option value="">Tất cả phòng</option>
-              {PHONG_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          )}
           <select className={`hd-filter-select${filterKhu ? ' active' : ''}`} value={filterKhu} onChange={e => setFilterKhu(e.target.value)}>
             <option value="">Tất cả khu CN</option>
             {KHU_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
@@ -494,7 +518,11 @@ export default function HopDongPage() {
                       <tr key={`g-${g.nhanVienId}`} className="hd-group-row">
                         <td colSpan={7}>
                           <span className="hd-group-title">
-                            {g.nhanVien === 'Chưa phân công' ? g.nhanVien : `CV / P.Trưởng phòng: ${g.nhanVien}`}
+                            {g.nhanVien === 'Chưa phân công'
+                              ? g.nhanVien
+                              : g.nhanVienRole === 'truong_phong'
+                                ? `Trưởng phòng: ${g.nhanVien}`
+                                : `CV: ${g.nhanVien}`}
                           </span>
                         </td>
                         <td colSpan={4} className="hd-group-revenue">
@@ -584,7 +612,7 @@ export default function HopDongPage() {
                       className={err('phong') ? 'input-invalid' : ''}
                     >
                       <option value="">— Chọn phòng —</option>
-                      {PHONG_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                      {phongOptions.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </MField>
                 )}

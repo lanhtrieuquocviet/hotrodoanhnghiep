@@ -174,6 +174,27 @@
   font-size: 18px;
 }
 
+/* ── PIE ROW (Trưởng phòng) ── */
+.cd-pie-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.cd-pie-block {
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 16px;
+}
+.cd-pie-label {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 @media (max-width: 900px) {
   .cd-chart-table {
     grid-template-columns: 1fr;
@@ -181,5 +202,8 @@
   .cd-chart {
     border-right: none;
     border-bottom: 1px solid #e5e7eb;
+  }
+  .cd-pie-row {
+    grid-template-columns: 1fr;
   }
 }
