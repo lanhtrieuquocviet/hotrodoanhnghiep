@@ -1,6 +1,57 @@
 import HopDong from '../models/HopDong.js';
 import User from '../models/User.js';
 
+const PHONG_OPTIONS = [
+  'Phòng Dịch vụ Tổng hợp, Đào tạo và Bồi dưỡng',
+  'Phòng Dịch vụ Khoa học Công nghệ',
+];
+const KHU_KHAC = 'Khác';
+const KHU_PRESET = [
+  'CNC Hòa Lạc', 'Nội Bài', 'Phú Nghĩa', 'Quang Minh', 'Sài Đồng',
+  'Thăng Long', 'Thạch Thất Quốc Oai', 'Bắc Thăng Long',
+];
+const TRANG_THAI_KY = ['Đã ký kết', 'Đang thương thảo', 'Chưa ký'];
+const TRANG_THAI_HD = ['Đang thực hiện', 'Đã hoàn thành', 'Hủy'];
+const XAC_NHAN_OPT = ['', 'Hoàn thành', 'Chưa hoàn thành'];
+
+function validateHopDongBody(body) {
+  const ten = body.tenDoanhNghiep?.trim();
+  if (!ten) return 'Tên doanh nghiệp không được để trống';
+  if (ten.length < 2) return 'Tên doanh nghiệp quá ngắn';
+  if (ten.length > 200) return 'Tên doanh nghiệp tối đa 200 ký tự';
+
+  if (!body.phong || !PHONG_OPTIONS.includes(body.phong)) return 'Phòng ban không hợp lệ';
+
+  if (body.soHopDong?.trim().length > 50) return 'Số hợp đồng tối đa 50 ký tự';
+  if (body.sdtVaNguoiLienHe?.trim().length > 100) return 'SDT / người liên hệ tối đa 100 ký tự';
+
+  if (body.khuCongNghiep) {
+    const khu = body.khuCongNghiep.trim();
+    if (khu === KHU_KHAC) return 'Vui lòng nhập tên khu công nghiệp';
+    if (!KHU_PRESET.includes(khu) && (khu.length < 2 || khu.length > 100)) {
+      return 'Tên khu công nghiệp không hợp lệ (2–100 ký tự)';
+    }
+    body.khuCongNghiep = khu;
+  }
+
+  if (body.linhVuc?.trim().length > 200) return 'Lĩnh vực tối đa 200 ký tự';
+  if (body.trangThaiKy && !TRANG_THAI_KY.includes(body.trangThaiKy)) return 'Tình trạng ký kết không hợp lệ';
+  if (body.trangThai && !TRANG_THAI_HD.includes(body.trangThai)) return 'Tình trạng thực hiện không hợp lệ';
+  if (body.xacNhan != null && body.xacNhan !== '' && !XAC_NHAN_OPT.includes(body.xacNhan)) {
+    return 'Xác nhận không hợp lệ';
+  }
+
+  const gt = Number(body.giaTriHopDong);
+  if (body.giaTriHopDong != null && (Number.isNaN(gt) || gt < 0)) {
+    return 'Giá trị hợp đồng phải là số không âm';
+  }
+  if (gt > 1e15) return 'Giá trị hợp đồng quá lớn';
+
+  if (body.ghiChu?.trim().length > 500) return 'Ghi chú tối đa 500 ký tự';
+
+  return null;
+}
+
 /* ── DASHBOARD ── */
 export const getDashboard = async (req, res, next) => {
   try {
@@ -84,7 +135,13 @@ export const createHopDong = async (req, res, next) => {
   try {
     const { user } = req;
     const body = { ...req.body };
+
     if (user.role !== 'admin' && user.phong) body.phong = user.phong;
+    body.nguoiPhuTrach = user._id;
+
+    const errMsg = validateHopDongBody(body);
+    if (errMsg) return res.status(400).json({ message: errMsg });
+
     const hopDong = await (await HopDong.create(body)).populate('nguoiPhuTrach', 'name phong');
     res.status(201).json(hopDong);
   } catch (err) { next(err); }
@@ -92,9 +149,21 @@ export const createHopDong = async (req, res, next) => {
 
 export const updateHopDong = async (req, res, next) => {
   try {
-    const hopDong = await HopDong.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
+    const { user } = req;
+    const existing = await HopDong.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Không tìm thấy hợp đồng' });
+
+    const body = { ...req.body };
+    if (user.role !== 'admin' && user.phong) {
+      body.phong = user.phong;
+      body.nguoiPhuTrach = existing.nguoiPhuTrach || user._id;
+    }
+
+    const errMsg = validateHopDongBody({ ...existing.toObject(), ...body });
+    if (errMsg) return res.status(400).json({ message: errMsg });
+
+    const hopDong = await HopDong.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true })
       .populate('nguoiPhuTrach', 'name phong');
-    if (!hopDong) return res.status(404).json({ message: 'Không tìm thấy hợp đồng' });
     res.json(hopDong);
   } catch (err) { next(err); }
 };

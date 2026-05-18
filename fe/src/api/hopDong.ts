@@ -34,16 +34,21 @@ export const PHONG_OPTIONS = [
   'Phòng Dịch vụ Khoa học Công nghệ',
 ] as const
 
-export const KHU_OPTIONS = [
+export const KHU_KHAC = 'Khác' as const
+
+export const KHU_PRESET_OPTIONS = [
   'CNC Hòa Lạc',
-  'Khác',
   'Nội Bài',
   'Phú Nghĩa',
   'Quang Minh',
   'Sài Đồng',
   'Thăng Long',
   'Thạch Thất Quốc Oai',
+  'Bắc Thăng Long',
 ] as const
+
+/** Danh sách dropdown: preset + "Khác" ở cuối */
+export const KHU_OPTIONS = [...KHU_PRESET_OPTIONS, KHU_KHAC] as const
 
 export const getDashboard = () =>
   api.get<DashboardData>('/hop-dong/dashboard').then((r) => r.data)

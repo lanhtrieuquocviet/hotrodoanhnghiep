@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
-import { PHONG_OPTIONS, KHU_OPTIONS } from '../api/hopDong'
+import { PHONG_OPTIONS, KHU_OPTIONS, KHU_PRESET_OPTIONS, KHU_KHAC } from '../api/hopDong'
 import './HopDong.css'
 
 /* ── Types ── */
@@ -30,16 +30,109 @@ const XAC_NHAN_OPT    = ['', 'Hoàn thành', 'Chưa hoàn thành']
 
 const EMPTY_FORM = {
   soHopDong: '', tenDoanhNghiep: '', phong: '', nguoiPhuTrach: '',
-  sdtVaNguoiLienHe: '', khuCongNghiep: '', linhVuc: '',
+  sdtVaNguoiLienHe: '', khuCongNghiep: '', khuCongNghiepTen: '', linhVuc: '',
   trangThaiKy: 'Chưa ký', ngayKy: '', giaTriHopDong: '',
   trangThai: 'Đang thực hiện', xacNhan: '', ghiChu: '',
 }
 
+const isPresetKhu = (v: string) => (KHU_PRESET_OPTIONS as readonly string[]).includes(v)
+
+const khuStoredToForm = (stored?: string) => {
+  if (!stored) return { khuCongNghiep: '', khuCongNghiepTen: '' }
+  if (isPresetKhu(stored)) return { khuCongNghiep: stored, khuCongNghiepTen: '' }
+  return { khuCongNghiep: KHU_KHAC, khuCongNghiepTen: stored }
+}
+
+const resolveKhuPayload = (form: HopDongForm) => {
+  if (!form.khuCongNghiep) return undefined
+  if (form.khuCongNghiep === KHU_KHAC) return form.khuCongNghiepTen.trim() || undefined
+  return form.khuCongNghiep
+}
+
+type HopDongForm = typeof EMPTY_FORM
+type HopDongFormErrors = Partial<Record<keyof HopDongForm, string>>
+
+function validateHopDongForm(
+  form: HopDongForm,
+  opts: { isAdmin: boolean; nguoiPhuTrachId: string },
+): HopDongFormErrors {
+  const errs: HopDongFormErrors = {}
+  const ten = form.tenDoanhNghiep.trim()
+  if (!ten) errs.tenDoanhNghiep = 'Tên doanh nghiệp không được để trống'
+  else if (ten.length < 2) errs.tenDoanhNghiep = 'Tên doanh nghiệp quá ngắn'
+  else if (ten.length > 200) errs.tenDoanhNghiep = 'Tên doanh nghiệp tối đa 200 ký tự'
+
+  if (opts.isAdmin && !form.phong) errs.phong = 'Vui lòng chọn phòng ban'
+  if (!opts.nguoiPhuTrachId) errs.nguoiPhuTrach = 'Không xác định được người phụ trách'
+
+  if (form.soHopDong.trim().length > 50) errs.soHopDong = 'Số hợp đồng tối đa 50 ký tự'
+
+  if (form.sdtVaNguoiLienHe.trim().length > 100) {
+    errs.sdtVaNguoiLienHe = 'SDT / người liên hệ tối đa 100 ký tự'
+  }
+
+  if (form.khuCongNghiep === KHU_KHAC) {
+    const tenKhu = form.khuCongNghiepTen.trim()
+    if (!tenKhu) errs.khuCongNghiepTen = 'Vui lòng nhập tên khu công nghiệp'
+    else if (tenKhu.length < 2) errs.khuCongNghiepTen = 'Tên khu công nghiệp quá ngắn'
+    else if (tenKhu.length > 100) errs.khuCongNghiepTen = 'Tên khu công nghiệp tối đa 100 ký tự'
+  } else if (form.khuCongNghiep && !isPresetKhu(form.khuCongNghiep)) {
+    errs.khuCongNghiep = 'Khu công nghiệp không hợp lệ'
+  }
+
+  if (form.linhVuc.trim().length > 200) errs.linhVuc = 'Lĩnh vực tối đa 200 ký tự'
+
+  if (!TRANG_THAI_KY.includes(form.trangThaiKy)) errs.trangThaiKy = 'Tình trạng ký kết không hợp lệ'
+
+  if (form.ngayKy && !parseDateInput(form.ngayKy)) {
+    errs.ngayKy = 'Ngày không hợp lệ'
+  }
+
+  const gt = form.giaTriHopDong.trim()
+  if (gt) {
+    const n = Number(gt)
+    if (Number.isNaN(n) || n < 0) errs.giaTriHopDong = 'Giá trị hợp đồng phải là số không âm'
+    else if (n > 1e15) errs.giaTriHopDong = 'Giá trị hợp đồng quá lớn'
+  }
+
+  if (!TRANG_THAI_HD.includes(form.trangThai)) errs.trangThai = 'Tình trạng thực hiện không hợp lệ'
+
+  if (form.xacNhan && !XAC_NHAN_OPT.includes(form.xacNhan)) errs.xacNhan = 'Xác nhận không hợp lệ'
+
+  if (form.ghiChu.trim().length > 500) errs.ghiChu = 'Ghi chú tối đa 500 ký tự'
+
+  return errs
+}
+
 const formatVND = (v: number) => v > 0 ? v.toLocaleString('vi-VN') + ' đ' : '—'
+
+/** ISO/date string → YYYY-MM-DD cho input type="date" */
+const toDateInputValue = (iso?: string) => {
+  if (!iso) return ''
+  const dt = new Date(iso)
+  if (Number.isNaN(dt.getTime())) return ''
+  const y = dt.getFullYear()
+  const m = String(dt.getMonth() + 1).padStart(2, '0')
+  const day = String(dt.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const parseDateInput = (value: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!m) return null
+  const y = Number(m[1])
+  const mo = Number(m[2]) - 1
+  const d = Number(m[3])
+  const dt = new Date(y, mo, d)
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo || dt.getDate() !== d) return null
+  return dt
+}
+
 const formatNgay = (d?: string) => {
   if (!d) return '—'
   const dt = new Date(d)
-  return `Tháng ${dt.getMonth() + 1}/${dt.getFullYear()}`
+  if (Number.isNaN(dt.getTime())) return '—'
+  return dt.toLocaleDateString('vi-VN')
 }
 
 /* ── Grouped data helper ── */
@@ -86,12 +179,13 @@ export default function HopDongPage() {
   const [filterXacNhan, setFilterXacNhan] = useState('')
   const [filterPhong, setFilterPhong] = useState('')
 
-  const [nhanViens, setNhanViens] = useState<NhanVien[]>([])
   const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null)
   const [selected, setSelected] = useState<HopDong | null>(null)
-  const [form, setForm] = useState<typeof EMPTY_FORM>({ ...EMPTY_FORM })
+  const [form, setForm] = useState<HopDongForm>({ ...EMPTY_FORM })
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<HopDongFormErrors>({})
+  const [touched, setTouched] = useState<Partial<Record<keyof HopDongForm, boolean>>>({})
 
   /* fetch contracts */
   const fetchData = useCallback(async (s = search) => {
@@ -120,22 +214,59 @@ export default function HopDongPage() {
 
   useEffect(() => { fetchData('') }, [])
 
-  /* fetch nhan vien cho dropdown khi phong thay đổi */
-  useEffect(() => {
-    const phong = form.phong || me?.phong || ''
-    if (!phong) { setNhanViens([]); return }
-    api.get('/hop-dong/nhan-vien', { params: { phong } }).then(r => setNhanViens(r.data))
-  }, [form.phong, me?.phong])
-
   const handleSearch = (v: string) => {
     setSearch(v)
     fetchData(v)
   }
 
+  const resetFormState = () => {
+    setFormError('')
+    setFieldErrors({})
+    setTouched({})
+  }
+
+  const nguoiPhuTrachLabel =
+    modal === 'create'
+      ? me?.name || ''
+      : selected?.nguoiPhuTrach?.name || me?.name || ''
+
+  const resolveNguoiPhuTrachId = () =>
+    modal === 'create' ? (me?._id || '') : (form.nguoiPhuTrach || me?._id || '')
+
+  const runValidation = () => {
+    const errs = validateHopDongForm(form, {
+      isAdmin: me?.role === 'admin',
+      nguoiPhuTrachId: resolveNguoiPhuTrachId(),
+    })
+    setFieldErrors(errs)
+    setTouched({
+      tenDoanhNghiep: true, phong: true, nguoiPhuTrach: true,
+      soHopDong: true, sdtVaNguoiLienHe: true, khuCongNghiep: true, khuCongNghiepTen: true, linhVuc: true,
+      trangThaiKy: true, ngayKy: true, giaTriHopDong: true, trangThai: true, xacNhan: true, ghiChu: true,
+    })
+    if (Object.keys(errs).length > 0) {
+      setFormError(Object.values(errs)[0])
+      return false
+    }
+    setFormError('')
+    return true
+  }
+
+  const touch = (field: keyof HopDongForm) =>
+    setTouched(t => ({ ...t, [field]: true }))
+
+  const err = (field: keyof HopDongForm) =>
+    touched[field] ? fieldErrors[field] : undefined
+
   /* modal helpers */
   const openCreate = () => {
-    setForm({ ...EMPTY_FORM, phong: me?.phong || '' })
-    setFormError(''); setModal('create')
+    setForm({
+      ...EMPTY_FORM,
+      phong: me?.phong || '',
+      nguoiPhuTrach: me?._id || '',
+    })
+    resetFormState()
+    setModal('create')
   }
   const openEdit = (hd: HopDong) => {
     setSelected(hd)
@@ -145,34 +276,43 @@ export default function HopDongPage() {
       phong: hd.phong,
       nguoiPhuTrach: hd.nguoiPhuTrach?._id || '',
       sdtVaNguoiLienHe: hd.sdtVaNguoiLienHe || '',
-      khuCongNghiep: hd.khuCongNghiep || '',
+      ...khuStoredToForm(hd.khuCongNghiep),
       linhVuc: hd.linhVuc || '',
       trangThaiKy: hd.trangThaiKy || 'Chưa ký',
-      ngayKy: hd.ngayKy ? hd.ngayKy.slice(0, 7) : '',
+      ngayKy: toDateInputValue(hd.ngayKy),
       giaTriHopDong: hd.giaTriHopDong ? String(hd.giaTriHopDong) : '',
       trangThai: hd.trangThai || 'Đang thực hiện',
       xacNhan: hd.xacNhan || '',
       ghiChu: hd.ghiChu || '',
     })
-    setFormError(''); setModal('edit')
+    resetFormState()
+    setModal('edit')
   }
   const openDelete = (hd: HopDong) => { setSelected(hd); setModal('delete') }
-  const closeModal = () => { setModal(null); setSelected(null); setFormError('') }
+  const closeModal = () => {
+    setModal(null)
+    setSelected(null)
+    resetFormState()
+  }
 
   const apiErr = (e: unknown) =>
     (e as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Có lỗi xảy ra'
 
-  const buildPayload = () => ({
-    ...form,
-    nguoiPhuTrach: form.nguoiPhuTrach || null,
-    giaTriHopDong: Number(form.giaTriHopDong) || 0,
-    ngayKy: form.ngayKy ? new Date(form.ngayKy + '-01').toISOString() : null,
-    khuCongNghiep: form.khuCongNghiep || undefined,
-  })
+  const buildPayload = () => {
+    const { khuCongNghiepTen: _ten, ...rest } = form
+    return {
+      ...rest,
+      phong: form.phong || me?.phong || '',
+      nguoiPhuTrach: resolveNguoiPhuTrachId() || null,
+      giaTriHopDong: Number(form.giaTriHopDong) || 0,
+      ngayKy: form.ngayKy ? parseDateInput(form.ngayKy)!.toISOString() : null,
+      khuCongNghiep: resolveKhuPayload(form),
+      xacNhan: form.xacNhan || '',
+    }
+  }
 
   const handleCreate = async () => {
-    if (!form.tenDoanhNghiep.trim()) return setFormError('Tên doanh nghiệp không được để trống')
-    if (!form.phong) return setFormError('Vui lòng chọn phòng ban')
+    if (!runValidation()) return
     setSubmitting(true)
     try {
       await api.post('/hop-dong', buildPayload())
@@ -181,7 +321,7 @@ export default function HopDongPage() {
   }
 
   const handleEdit = async () => {
-    if (!form.tenDoanhNghiep.trim()) return setFormError('Tên doanh nghiệp không được để trống')
+    if (!runValidation()) return
     setSubmitting(true)
     try {
       await api.put(`/hop-dong/${selected!._id}`, buildPayload())
@@ -417,64 +557,154 @@ export default function HopDongPage() {
             <div className="modal-body modal-grid">
               {/* Cột trái */}
               <div className="modal-col">
-                <MField label="Tên Doanh nghiệp *">
-                  <input value={form.tenDoanhNghiep} onChange={e => setForm(f => ({ ...f, tenDoanhNghiep: e.target.value }))} placeholder="Công ty TNHH..." />
+                <MField label="Tên Doanh nghiệp *" error={err('tenDoanhNghiep')}>
+                  <input
+                    value={form.tenDoanhNghiep}
+                    onChange={e => { setForm(f => ({ ...f, tenDoanhNghiep: e.target.value })); setFormError('') }}
+                    onBlur={() => touch('tenDoanhNghiep')}
+                    placeholder="Công ty TNHH..."
+                    className={err('tenDoanhNghiep') ? 'input-invalid' : ''}
+                  />
                 </MField>
-                <MField label="Số hợp đồng">
-                  <input value={form.soHopDong} onChange={e => setForm(f => ({ ...f, soHopDong: e.target.value }))} placeholder="HD-2026-001" />
+                <MField label="Số hợp đồng" error={err('soHopDong')}>
+                  <input
+                    value={form.soHopDong}
+                    onChange={e => setForm(f => ({ ...f, soHopDong: e.target.value }))}
+                    onBlur={() => touch('soHopDong')}
+                    placeholder="HD-2026-001"
+                    className={err('soHopDong') ? 'input-invalid' : ''}
+                  />
                 </MField>
                 {me?.role === 'admin' && (
-                  <MField label="Phòng ban *">
-                    <select value={form.phong} onChange={e => setForm(f => ({ ...f, phong: e.target.value, nguoiPhuTrach: '' }))}>
+                  <MField label="Phòng ban *" error={err('phong')}>
+                    <select
+                      value={form.phong}
+                      onChange={e => setForm(f => ({ ...f, phong: e.target.value }))}
+                      onBlur={() => touch('phong')}
+                      className={err('phong') ? 'input-invalid' : ''}
+                    >
                       <option value="">— Chọn phòng —</option>
                       {PHONG_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </MField>
                 )}
-                <MField label="Người phụ trách">
-                  <select value={form.nguoiPhuTrach} onChange={e => setForm(f => ({ ...f, nguoiPhuTrach: e.target.value }))}>
-                    <option value="">— Chọn nhân viên —</option>
-                    {nhanViens.map(nv => <option key={nv._id} value={nv._id}>{nv.name}</option>)}
-                  </select>
+                <MField label="Người phụ trách" error={err('nguoiPhuTrach')}>
+                  <input className="input-disabled" value={nguoiPhuTrachLabel} readOnly disabled />
                 </MField>
-                <MField label="SDT và người liên hệ">
-                  <input value={form.sdtVaNguoiLienHe} onChange={e => setForm(f => ({ ...f, sdtVaNguoiLienHe: e.target.value }))} placeholder="0912345678 – Nguyễn Văn A" />
+                <MField label="SDT và người liên hệ" error={err('sdtVaNguoiLienHe')}>
+                  <input
+                    value={form.sdtVaNguoiLienHe}
+                    onChange={e => setForm(f => ({ ...f, sdtVaNguoiLienHe: e.target.value }))}
+                    onBlur={() => touch('sdtVaNguoiLienHe')}
+                    placeholder="0912345678 – Nguyễn Văn A"
+                    className={err('sdtVaNguoiLienHe') ? 'input-invalid' : ''}
+                  />
                 </MField>
-                <MField label="Khu công nghiệp">
-                  <select value={form.khuCongNghiep} onChange={e => setForm(f => ({ ...f, khuCongNghiep: e.target.value }))}>
+                <MField label="Khu công nghiệp" error={err('khuCongNghiep')}>
+                  <select
+                    value={form.khuCongNghiep}
+                    onChange={e => {
+                      const v = e.target.value
+                      setForm(f => ({
+                        ...f,
+                        khuCongNghiep: v,
+                        khuCongNghiepTen: v === KHU_KHAC ? f.khuCongNghiepTen : '',
+                      }))
+                      setFormError('')
+                    }}
+                    onBlur={() => touch('khuCongNghiep')}
+                    className={err('khuCongNghiep') ? 'input-invalid' : ''}
+                  >
                     <option value="">— Chọn khu CN —</option>
-                    {KHU_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
+                    {KHU_PRESET_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
+                    <option value={KHU_KHAC}>{KHU_KHAC}</option>
                   </select>
                 </MField>
+                {form.khuCongNghiep === KHU_KHAC && (
+                  <MField label="Tên khu công nghiệp *" error={err('khuCongNghiepTen')}>
+                    <input
+                      value={form.khuCongNghiepTen}
+                      onChange={e => {
+                        setForm(f => ({ ...f, khuCongNghiepTen: e.target.value }))
+                        setFormError('')
+                      }}
+                      onBlur={() => touch('khuCongNghiepTen')}
+                      placeholder="Nhập tên khu công nghiệp..."
+                      className={err('khuCongNghiepTen') ? 'input-invalid' : ''}
+                    />
+                  </MField>
+                )}
               </div>
               {/* Cột phải */}
               <div className="modal-col">
-                <MField label="Lĩnh vực thực hiện">
-                  <input value={form.linhVuc} onChange={e => setForm(f => ({ ...f, linhVuc: e.target.value }))} placeholder="An toàn vệ sinh lao động..." />
+                <MField label="Lĩnh vực thực hiện" error={err('linhVuc')}>
+                  <input
+                    value={form.linhVuc}
+                    onChange={e => setForm(f => ({ ...f, linhVuc: e.target.value }))}
+                    onBlur={() => touch('linhVuc')}
+                    placeholder="An toàn vệ sinh lao động..."
+                    className={err('linhVuc') ? 'input-invalid' : ''}
+                  />
                 </MField>
-                <MField label="Tình trạng ký kết">
-                  <select value={form.trangThaiKy} onChange={e => setForm(f => ({ ...f, trangThaiKy: e.target.value }))}>
+                <MField label="Tình trạng ký kết" error={err('trangThaiKy')}>
+                  <select
+                    value={form.trangThaiKy}
+                    onChange={e => setForm(f => ({ ...f, trangThaiKy: e.target.value }))}
+                    onBlur={() => touch('trangThaiKy')}
+                    className={err('trangThaiKy') ? 'input-invalid' : ''}
+                  >
                     {TRANG_THAI_KY.map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </MField>
-                <MField label="Ngày tháng">
-                  <input type="month" value={form.ngayKy} onChange={e => setForm(f => ({ ...f, ngayKy: e.target.value }))} />
+                <MField label="Ngày" error={err('ngayKy')}>
+                  <input
+                    type="date"
+                    value={form.ngayKy}
+                    onChange={e => setForm(f => ({ ...f, ngayKy: e.target.value }))}
+                    onBlur={() => touch('ngayKy')}
+                    className={err('ngayKy') ? 'input-invalid' : ''}
+                  />
                 </MField>
-                <MField label="Giá trị hợp đồng (đ)">
-                  <input type="number" value={form.giaTriHopDong} onChange={e => setForm(f => ({ ...f, giaTriHopDong: e.target.value }))} placeholder="0" min="0" />
+                <MField label="Giá trị hợp đồng (đ)" error={err('giaTriHopDong')}>
+                  <input
+                    type="number"
+                    value={form.giaTriHopDong}
+                    onChange={e => setForm(f => ({ ...f, giaTriHopDong: e.target.value }))}
+                    onBlur={() => touch('giaTriHopDong')}
+                    placeholder="0"
+                    min="0"
+                    className={err('giaTriHopDong') ? 'input-invalid' : ''}
+                  />
                 </MField>
-                <MField label="Tình trạng thực hiện">
-                  <select value={form.trangThai} onChange={e => setForm(f => ({ ...f, trangThai: e.target.value }))}>
+                <MField label="Tình trạng thực hiện" error={err('trangThai')}>
+                  <select
+                    value={form.trangThai}
+                    onChange={e => setForm(f => ({ ...f, trangThai: e.target.value }))}
+                    onBlur={() => touch('trangThai')}
+                    className={err('trangThai') ? 'input-invalid' : ''}
+                  >
                     {TRANG_THAI_HD.map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </MField>
-                <MField label="Xác nhận">
-                  <select value={form.xacNhan} onChange={e => setForm(f => ({ ...f, xacNhan: e.target.value }))}>
+                <MField label="Xác nhận" error={err('xacNhan')}>
+                  <select
+                    value={form.xacNhan}
+                    onChange={e => setForm(f => ({ ...f, xacNhan: e.target.value }))}
+                    onBlur={() => touch('xacNhan')}
+                    className={err('xacNhan') ? 'input-invalid' : ''}
+                  >
                     {XAC_NHAN_OPT.map(v => <option key={v} value={v}>{v || '— Chưa xác nhận —'}</option>)}
                   </select>
                 </MField>
-                <MField label="Ghi chú">
-                  <textarea value={form.ghiChu} onChange={e => setForm(f => ({ ...f, ghiChu: e.target.value }))} rows={2} placeholder="Ghi chú thêm..." />
+                <MField label="Ghi chú" error={err('ghiChu')}>
+                  <textarea
+                    value={form.ghiChu}
+                    onChange={e => setForm(f => ({ ...f, ghiChu: e.target.value }))}
+                    onBlur={() => touch('ghiChu')}
+                    rows={2}
+                    placeholder="Ghi chú thêm..."
+                    className={err('ghiChu') ? 'input-invalid' : ''}
+                  />
                 </MField>
               </div>
             </div>
@@ -513,11 +743,12 @@ export default function HopDongPage() {
   )
 }
 
-function MField({ label, children }: { label: string; children: React.ReactNode }) {
+function MField({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
   return (
     <div className="modal-field">
       <label>{label}</label>
       {children}
+      {error && <span className="hd-field-error">{error}</span>}
     </div>
   )
 }

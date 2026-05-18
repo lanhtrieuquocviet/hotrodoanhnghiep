@@ -11,10 +11,7 @@ const hopDongSchema = new mongoose.Schema(
     },
     nguoiPhuTrach: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     sdtVaNguoiLienHe: { type: String, trim: true },
-    khuCongNghiep: {
-      type: String,
-      enum: ['CNC Hòa Lạc', 'Khác', 'Nội Bài', 'Phú Nghĩa', 'Quang Minh', 'Sài Đồng', 'Thăng Long', 'Thạch Thất Quốc Oai', 'Bắc Thăng Long'],
-    },
+    khuCongNghiep: { type: String, trim: true },
     linhVuc: { type: String, trim: true },
     trangThaiKy: {
       type: String,
